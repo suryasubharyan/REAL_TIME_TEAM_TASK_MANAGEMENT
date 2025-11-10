@@ -23,6 +23,8 @@ const allowedOrigins = [
   "https://frontend-isaq.onrender.com", // your frontend hosted on Render
   "http://localhost:5173",              // local dev
 ];
+// ✅ Keep WebSocket connections alive on Render
+app.set("trust proxy", 1);
 
 // ✅ Apply CORS manually (Render-safe)
 app.use((req, res, next) => {

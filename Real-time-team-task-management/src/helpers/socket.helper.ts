@@ -32,6 +32,10 @@ const initializeSocket = (server: http.Server) => {
     });
   });
 
+  setInterval(() => {
+  io.emit("ping", { time: new Date().toISOString() });
+}, 25000);
+
   return io;
 };
 
