@@ -16,16 +16,36 @@ dotenv.config();
 // ✅ Connect to MongoDB
 connectDB();
 
+// ✅ Initialize Express
 const app = express();
-app.use(cors({
-  origin: [
-    "https://frontend-isaq.onrender.com", // 🧠 replace with your actual Vercel URL
-    "http://localhost:5173", // optional: for local testing (Vite)
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  credentials: true,
-}));
 
+// ✅ Allowed origins
+const allowedOrigins = [
+  "https://frontend-isaq.onrender.com", // your deployed frontend on Render
+  "http://localhost:5173",              // local Vite dev environment
+];
+
+// ✅ Proper CORS setup
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn("❌ Blocked by CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+// ✅ Handle Preflight Requests
+app.options("*", cors());
+
+// ✅ Parse incoming JSON
 app.use(express.json());
 
 // ✅ Load Swagger YAML file safely
