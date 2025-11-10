@@ -1,37 +1,44 @@
-// src/utils/socket.js
 import { io } from "socket.io-client";
 
 let socket;
 
-export function initSocket() {
+export const initSocket = (token) => {
   if (socket) return socket;
 
-  const backend = import.meta.env.VITE_SOCKET_URL || "https://backend-g282.onrender.com";
+  const socketUrl =
+    import.meta.env.VITE_SOCKET_URL || "https://backend-g282.onrender.com";
 
-  socket = io(backend, {
-    transports: ["polling", "websocket"],
+  console.log("🌍 Initializing Socket.io at:", socketUrl);
+
+  socket = io(socketUrl, {
+    path: "/socket.io/",
+    transports: ["websocket", "polling"],
     withCredentials: true,
-    autoConnect: true,
+    auth: { token },
     reconnection: true,
     reconnectionAttempts: 10,
-    reconnectionDelay: 1000,
-    // send token for auth
-    auth: {
-      token: localStorage.getItem("token") || null,
-    },
+    reconnectionDelay: 2000,
   });
 
-  socket.on("connect", () => console.log("Socket connected:", socket.id));
-  socket.on("disconnect", (reason) => console.log("Socket disconnected:", reason));
-  socket.on("connect_error", (err) => console.error("Socket connect error:", err.message));
+  socket.on("connect", () => {
+    console.log("🟢 Socket connected:", socket.id);
+  });
+
+  socket.on("connect_error", (err) => {
+    console.error("❌ Socket connect error:", err.message);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.warn("🔴 Socket disconnected:", reason);
+  });
 
   return socket;
-}
+};
 
-export function getSocket() {
-  return socket;
-}
+export const getSocket = () => socket;
 export const closeSocket = () => {
-  if (socket) socket.disconnect();
-  socket = null;
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 };

@@ -9,7 +9,7 @@ import authRoutes from "./routes/auth.routes";
 import teamRoutes from "./routes/team.routes";
 import projectRoutes from "./routes/project.routes";
 import taskRoutes from "./routes/task.routes";
-
+import activityRoutes from "./routes/activity.routes";
 dotenv.config();
 
 // ✅ Connect to MongoDB
@@ -54,7 +54,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/project", projectRoutes);
 app.use("/api/task", taskRoutes);
-
+app.use("/api/activity", activityRoutes);
 // ✅ Health Check route
 app.get("/", (_, res) => {
   res.send("✅ Real-Time Team Task Management API is running...");

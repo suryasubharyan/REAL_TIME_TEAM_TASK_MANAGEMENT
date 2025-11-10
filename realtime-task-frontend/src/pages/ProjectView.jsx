@@ -8,10 +8,13 @@ import TaskCard from "../components/TaskCard";
 import Notification from "../components/Notification";
 import CreateTaskModal from "../components/CreateTaskModal";
 import { useAuth } from "../context/AuthContext";
+import { getSocket, initSocket } from "../utils/socket";
 
 export default function ProjectView() {
   const { teamId } = useParams();
   const location = useLocation();
+  const { user } = useAuth();
+
   const stateTeam = location.state?.team;
   const [team, setTeam] = useState(stateTeam || null);
   const [projects, setProjects] = useState([]);
@@ -21,9 +24,33 @@ export default function ProjectView() {
   const [notif, setNotif] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editTask, setEditTask] = useState(null);
-  const { user } = useAuth();
+  const [socketConnected, setSocketConnected] = useState(false);
 
-  // ✅ Socket listener hook
+  // ✅ Initialize socket safely
+  useEffect(() => {
+    const socket = getSocket() || initSocket();
+
+    if (socket && !socket.listeners("connect").length) {
+      socket.on("connect", () => {
+        setSocketConnected(true);
+        console.log("🟢 Socket connected:", socket.id);
+      });
+
+      socket.on("disconnect", () => {
+        setSocketConnected(false);
+        console.warn("🔴 Socket disconnected");
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off("connect");
+        socket.off("disconnect");
+      }
+    };
+  }, []);
+
+  // ✅ Socket listeners for task & activity updates
   useTeamSocket(teamId, {
     task_created: (d) => {
       if (d?.task?.project === activeProject?._id) {
@@ -56,15 +83,16 @@ export default function ProjectView() {
           const found = teamsRes.data.teams?.find((t) => t._id === teamId);
           if (found) setTeam(found);
         }
-        const res = await axios.get(`/project/team/${teamId}`);
-        setProjects(res.data.projects || []);
 
-        if (res.data.projects?.length) {
+        const res = await axios.get(`/project/team/${teamId}`);
+        const projectList = res.data.projects || [];
+        setProjects(projectList);
+
+        if (projectList.length) {
           const lastProjId = localStorage.getItem("lastProjectId");
-          const choose =
-            res.data.projects.find((p) => p._id === lastProjId) ||
-            res.data.projects[0];
-          setActiveProject(choose);
+          const selected =
+            projectList.find((p) => p._id === lastProjId) || projectList[0];
+          setActiveProject(selected);
         }
       } catch (err) {
         console.error("❌ Project fetch failed:", err);
@@ -72,28 +100,32 @@ export default function ProjectView() {
     })();
   }, [teamId]);
 
-  // ✅ Fetch tasks when active project changes
+  // ✅ Fetch tasks + activities when active project changes
   useEffect(() => {
     (async () => {
       if (!activeProject) {
         setTasks([]);
+        setActivities([]);
         return;
       }
+
       try {
         localStorage.setItem("lastProjectId", activeProject._id);
         const t = await axios.get(`/task/project/${activeProject._id}`);
         setTasks(t.data.tasks || []);
+
         const act = await axios.get(`/activity/project/${activeProject._id}`);
         setActivities(act.data.activities || []);
       } catch (err) {
-        console.error("❌ Task fetch failed:", err);
+        console.error("❌ Task or Activity fetch failed:", err);
       }
     })();
   }, [activeProject]);
 
+  // ✅ Helpers
   const showNotif = (message, type = "info") => {
     setNotif({ message, type });
-    setTimeout(() => setNotif(null), 3500);
+    setTimeout(() => setNotif(null), 3000);
   };
 
   const onProjectCreated = (proj) => {
@@ -107,6 +139,7 @@ export default function ProjectView() {
     showNotif("✅ Task saved successfully!", "success");
   };
 
+  // ✅ UI
   return (
     <div style={{ minHeight: "100vh", background: "#F9FAFB" }}>
       <Navbar />
@@ -114,7 +147,21 @@ export default function ProjectView() {
         {/* LEFT: PROJECT LIST */}
         <div style={{ width: 260 }}>
           <div style={{ marginBottom: 10 }}>
-            <h3 style={{ margin: 0 }}>Projects</h3>
+            <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              Projects
+              <div
+                title={socketConnected ? "Socket Connected" : "Disconnected"}
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: socketConnected ? "#10B981" : "#EF4444",
+                  boxShadow: socketConnected
+                    ? "0 0 6px #10B981"
+                    : "0 0 6px #EF4444",
+                }}
+              />
+            </h3>
             <small style={{ color: "#6B7280" }}>{team?.name}</small>
           </div>
 
@@ -148,7 +195,6 @@ export default function ProjectView() {
               Tasks for {activeProject?.name || "—"}
             </h3>
 
-            {/* ✅ Admin-only Add Task */}
             {user?.role === "admin" && (
               <button
                 onClick={() => {
@@ -223,7 +269,6 @@ export default function ProjectView() {
         </div>
       </div>
 
-      {/* ✅ Create/Edit Task Modal */}
       {showTaskModal && (
         <CreateTaskModal
           teamId={teamId}
@@ -264,7 +309,8 @@ function CreateProject({ teamId, onCreated }) {
       setName("");
       setDesc("");
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed");
+      console.error(err);
+      alert(err?.response?.data?.message || "Failed to create project");
     } finally {
       setLoading(false);
     }
