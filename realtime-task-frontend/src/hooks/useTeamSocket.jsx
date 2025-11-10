@@ -1,22 +1,25 @@
+// src/hooks/useTeamSocket.js
 import { useEffect } from "react";
-import { getSocket } from "../utils/socket"; // your socket helper that returns connected socket
+import { initSocket, getSocket } from "../utils/socket";
 
 export function useTeamSocket(teamId, handlers = {}) {
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket || !teamId) return;
-    socket.emit("joinTeamRoom", teamId);
+    if (!teamId) return;
+    const socket = initSocket();
 
-    const wrap = (name, fn) => {
-      if (!fn) return;
-      socket.on(name, fn);
-    };
+    // join the team room (server expects projectId -> finds team)
+    socket.emit("join_team_room", teamId);
 
-    for (const k in handlers) wrap(k, handlers[k]);
+    // register handlers
+    const bound = [];
+    Object.entries(handlers).forEach(([event, fn]) => {
+      socket.on(event, fn);
+      bound.push([event, fn]);
+    });
 
+    // cleanup
     return () => {
-      for (const k in handlers) socket.off(k, handlers[k]);
-      socket.emit("leaveTeamRoom", teamId);
+      bound.forEach(([event, fn]) => socket.off(event, fn));
     };
-  }, [teamId, JSON.stringify(handlers)]);
+  }, [teamId]);
 }

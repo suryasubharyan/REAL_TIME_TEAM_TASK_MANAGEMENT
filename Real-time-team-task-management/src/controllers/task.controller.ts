@@ -2,7 +2,7 @@ import { Response } from "express";
 import Task from "../models/task.model";
 import Project from "../models/project.model";
 import Activity from "../models/activity.model";
-import { getIO } from "../config/socket";
+import { getIO } from "../helpers/socket.helper";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
 // helper to emit to team room

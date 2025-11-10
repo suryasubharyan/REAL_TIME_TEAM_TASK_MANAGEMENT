@@ -1,31 +1,33 @@
+// src/utils/socket.js
 import { io } from "socket.io-client";
 
 let socket;
 
-export const initSocket = () => {
+export function initSocket() {
   if (socket) return socket;
 
-  socket = io("https://backend-g282.onrender.com", {
-    transports: ["websocket", "polling"], // allow both
+  const backend = import.meta.env.VITE_API_BASE_URL || "https://backend-g282.onrender.com";
+
+  socket = io(backend, {
+    transports: ["polling", "websocket"],
     withCredentials: true,
+    autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
+    // send token for auth
+    auth: {
+      token: localStorage.getItem("token") || null,
+    },
   });
 
-  socket.on("connect", () => {
-    console.log("🟢 Connected:", socket.id);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("🔴 Disconnected");
-  });
-
-  socket.on("connect_error", (err) => {
-    console.error("⚠️ Socket connect error:", err.message);
-  });
+  socket.on("connect", () => console.log("Socket connected:", socket.id));
+  socket.on("disconnect", (reason) => console.log("Socket disconnected:", reason));
+  socket.on("connect_error", (err) => console.error("Socket connect error:", err.message));
 
   return socket;
-};
+}
 
-export const getSocket = () => socket;
+export function getSocket() {
+  return socket;
+}
