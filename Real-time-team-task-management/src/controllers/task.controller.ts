@@ -56,7 +56,6 @@ export const createTask = async (req: AuthRequest, res: Response) => {
   }
 };
 
-
 export const getTasksByProject = async (req: AuthRequest, res: Response) => {
   try {
     const { projectId } = req.params;
@@ -86,7 +85,6 @@ export const getTasksByProject = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 export const updateTask = async (req: AuthRequest, res: Response) => {
   try {
@@ -136,7 +134,6 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ message: err.message });
   }
 };
-
 
 export const deleteTask = async (req: AuthRequest, res: Response) => {
   try {

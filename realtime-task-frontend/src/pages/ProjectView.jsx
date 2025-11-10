@@ -7,7 +7,7 @@ import ProjectCard from "../components/ProjectCard";
 import TaskCard from "../components/TaskCard";
 import Notification from "../components/Notification";
 import CreateTaskModal from "../components/CreateTaskModal";
-import { useAuth } from "../context/AuthContext"; // ✅ Added
+import { useAuth } from "../context/AuthContext";
 
 export default function ProjectView() {
   const { teamId } = useParams();
@@ -21,23 +21,33 @@ export default function ProjectView() {
   const [notif, setNotif] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editTask, setEditTask] = useState(null);
-  const { user } = useAuth(); // ✅ Get logged-in user
+  const { user } = useAuth();
 
+  // ✅ Socket listener hook
   useTeamSocket(teamId, {
     task_created: (d) => {
-      if (d?.task?.project === activeProject?._id)
+      if (d?.task?.project === activeProject?._id) {
         setTasks((t) => [d.task, ...t]);
+        showNotif(`🆕 New task added: ${d.task.title}`, "info");
+      }
     },
     task_updated: (d) => {
-      if (d?.task?.project === activeProject?._id)
+      if (d?.task?.project === activeProject?._id) {
         setTasks((t) => t.map((x) => (x._id === d.task._id ? d.task : x)));
+        showNotif(`✏️ Task updated: ${d.task.title}`, "success");
+      }
     },
     task_deleted: (d) => {
       setTasks((t) => t.filter((x) => x._id !== d.taskId));
+      showNotif("🗑️ Task deleted", "warning");
     },
-    activity_created: (d) => setActivities((a) => [d.activity, ...a]),
+    activity_created: (d) => {
+      setActivities((a) => [d.activity, ...a]);
+      if (d?.activity?.message) showNotif(d.activity.message, "info");
+    },
   });
 
+  // ✅ Fetch projects on mount
   useEffect(() => {
     (async () => {
       try {
@@ -48,6 +58,7 @@ export default function ProjectView() {
         }
         const res = await axios.get(`/project/team/${teamId}`);
         setProjects(res.data.projects || []);
+
         if (res.data.projects?.length) {
           const lastProjId = localStorage.getItem("lastProjectId");
           const choose =
@@ -56,11 +67,12 @@ export default function ProjectView() {
           setActiveProject(choose);
         }
       } catch (err) {
-        console.error(err);
+        console.error("❌ Project fetch failed:", err);
       }
     })();
   }, [teamId]);
 
+  // ✅ Fetch tasks when active project changes
   useEffect(() => {
     (async () => {
       if (!activeProject) {
@@ -71,26 +83,28 @@ export default function ProjectView() {
         localStorage.setItem("lastProjectId", activeProject._id);
         const t = await axios.get(`/task/project/${activeProject._id}`);
         setTasks(t.data.tasks || []);
+        const act = await axios.get(`/activity/project/${activeProject._id}`);
+        setActivities(act.data.activities || []);
       } catch (err) {
-        console.error(err);
+        console.error("❌ Task fetch failed:", err);
       }
     })();
   }, [activeProject]);
 
+  const showNotif = (message, type = "info") => {
+    setNotif({ message, type });
+    setTimeout(() => setNotif(null), 3500);
+  };
+
   const onProjectCreated = (proj) => {
-    setProjects([proj, ...projects]);
-    setNotif({ message: "Project created", type: "success" });
+    setProjects((prev) => [proj, ...prev]);
     setActiveProject(proj);
+    showNotif("✅ Project created successfully", "success");
   };
 
   const onTaskCreated = (task) => {
-    setTasks((prev) => {
-      const existing = prev.find((t) => t._id === task._id);
-      return existing
-        ? prev.map((t) => (t._id === task._id ? task : t))
-        : [task, ...prev];
-    });
-    setNotif({ message: "Task saved successfully!", type: "success" });
+    setTasks((prev) => [task, ...prev]);
+    showNotif("✅ Task saved successfully!", "success");
   };
 
   return (
@@ -103,6 +117,7 @@ export default function ProjectView() {
             <h3 style={{ margin: 0 }}>Projects</h3>
             <small style={{ color: "#6B7280" }}>{team?.name}</small>
           </div>
+
           <div>
             {projects.map((p) => (
               <ProjectCard
@@ -133,20 +148,14 @@ export default function ProjectView() {
               Tasks for {activeProject?.name || "—"}
             </h3>
 
-            {/* ✅ Only Admins can add tasks */}
+            {/* ✅ Admin-only Add Task */}
             {user?.role === "admin" && (
               <button
                 onClick={() => {
                   setEditTask(null);
                   setShowTaskModal(true);
                 }}
-                style={{
-                  background: "#10B981",
-                  color: "#fff",
-                  border: "none",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                }}
+                style={btnGreen}
               >
                 + Add Task
               </button>
@@ -183,7 +192,7 @@ export default function ProjectView() {
         {/* RIGHT: ACTIVITY LOG */}
         <div style={{ width: 340 }}>
           <h3 style={{ marginTop: 0 }}>Activity</h3>
-          <div>
+          <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
             {activities.map((a) => (
               <div
                 key={a._id}
@@ -192,6 +201,7 @@ export default function ProjectView() {
                   padding: 12,
                   borderRadius: 8,
                   marginBottom: 8,
+                  borderLeft: "4px solid #4F46E5",
                 }}
               >
                 <div style={{ fontSize: 14 }}>{a.message}</div>
@@ -206,11 +216,14 @@ export default function ProjectView() {
                 </div>
               </div>
             ))}
+            {activities.length === 0 && (
+              <div style={{ color: "#9CA3AF" }}>No activity yet.</div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ✅ Create or Edit Task */}
+      {/* ✅ Create/Edit Task Modal */}
       {showTaskModal && (
         <CreateTaskModal
           teamId={teamId}
@@ -259,80 +272,30 @@ function CreateProject({ teamId, onCreated }) {
 
   return (
     <div style={{ marginTop: 12 }}>
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          background: "#4F46E5",
-          color: "#fff",
-          border: "none",
-          padding: "8px 12px",
-          borderRadius: 8,
-        }}
-      >
+      <button onClick={() => setOpen(true)} style={btnPrimary}>
         + New Project
       </button>
       {open && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.25)",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: 18,
-              width: 420,
-              borderRadius: 10,
-            }}
-          >
+        <div style={modalOverlay}>
+          <div style={modalBox}>
             <h4 style={{ marginTop: 0 }}>Create Project</h4>
             <input
               placeholder="Project name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                marginBottom: 8,
-                borderRadius: 6,
-                border: "1px solid #E5E7EB",
-              }}
+              style={inputStyle}
             />
             <input
               placeholder="Description"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                marginBottom: 12,
-                borderRadius: 6,
-                border: "1px solid #E5E7EB",
-              }}
+              style={inputStyle}
             />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                onClick={() => setOpen(false)}
-                style={{ padding: "8px 10px", borderRadius: 6 }}
-              >
+              <button onClick={() => setOpen(false)} style={cancelBtn}>
                 Cancel
               </button>
-              <button
-                onClick={create}
-                disabled={loading}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                  background: "#4F46E5",
-                  color: "#fff",
-                  border: "none",
-                }}
-              >
+              <button onClick={create} disabled={loading} style={primaryBtn}>
                 {loading ? "Creating..." : "Create"}
               </button>
             </div>
@@ -342,3 +305,57 @@ function CreateProject({ teamId, onCreated }) {
     </div>
   );
 }
+
+/* 🎨 Styles */
+const btnPrimary = {
+  background: "#4F46E5",
+  color: "#fff",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: 8,
+};
+
+const btnGreen = {
+  background: "#10B981",
+  color: "#fff",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: 8,
+};
+
+const cancelBtn = {
+  padding: "8px 10px",
+  borderRadius: 6,
+};
+
+const primaryBtn = {
+  padding: "8px 10px",
+  borderRadius: 6,
+  background: "#4F46E5",
+  color: "#fff",
+  border: "none",
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: 8,
+  marginBottom: 10,
+  borderRadius: 6,
+  border: "1px solid #E5E7EB",
+};
+
+const modalOverlay = {
+  position: "fixed",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "rgba(0,0,0,0.25)",
+};
+
+const modalBox = {
+  background: "#fff",
+  padding: 18,
+  width: 420,
+  borderRadius: 10,
+};

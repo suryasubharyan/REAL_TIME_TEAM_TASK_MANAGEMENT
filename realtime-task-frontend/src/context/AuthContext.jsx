@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
+import { initSocket } from "../utils/socket"; // ✅ Import socket init
 
 const AuthContext = createContext(null);
 
@@ -9,7 +10,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // keep localStorage & state in sync
-    if (user) localStorage.setItem("user", JSON.stringify(user));
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // ✅ Initialize socket when user logs in
+      const token = localStorage.getItem("token");
+      if (token) {
+        initSocket(token);
+        console.log("⚡ Socket initialized for:", user.email);
+      }
+    }
   }, [user]);
 
   const logout = () => {

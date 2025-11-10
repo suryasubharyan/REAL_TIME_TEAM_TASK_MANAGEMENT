@@ -1,28 +1,27 @@
+// src/utils/socket.js
 import { io } from "socket.io-client";
 
-let socket;
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL || "https://backend-g282.onrender.com";
 
-export const initSocket = () => {
-  if (!socket) {
-    socket = io(import.meta.env.VITE_SOCKET_URL, {
-      transports: ["websocket", "polling"], // ✅ fallback added
-      withCredentials: true,
-      reconnectionAttempts: 5,
-      timeout: 20000, // 20s for Render wakeup
-    });
+let socket = null;
 
-    socket.on("connect", () => {
-      console.log("🟢 [Socket] Connected:", socket.id);
-    });
+export const initSocket = (token) => {
+  if (socket && socket.connected) return socket;
 
-    socket.on("disconnect", (reason) => {
-      console.log("🔴 [Socket] Disconnected:", reason);
-    });
+  socket = io(SOCKET_URL, {
+    auth: { token },
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+  });
 
-    socket.on("connect_error", (err) => {
-      console.error("⚠️ [Socket] Connection Error:", err.message);
-    });
-  }
+  socket.on("connect", () => console.log("🟢 Connected:", socket.id));
+  socket.on("disconnect", () => console.log("🔴 Disconnected"));
+  socket.on("connect_error", (err) =>
+    console.error("⚠️ Socket connect error:", err.message)
+  );
 
   return socket;
 };

@@ -4,7 +4,7 @@ import axios from "../api/axios";
 import TeamCard from "../components/TeamCard";
 import Notification from "../components/Notification";
 import { useAuth } from "../context/AuthContext";
-import { initSocket, getSocket } from "../utils/socket";
+import { getSocket } from "../utils/socket";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -16,16 +16,19 @@ export default function Dashboard() {
     if (!user?._id) return;
 
     fetchTeams();
-    const socket = initSocket();
+
+    const socket = getSocket();
+    if (!socket) return;
 
     socket.on("connect", () => {
       console.log("🟢 Socket connected:", socket.id);
     });
 
-    socket.on("joinedRooms", (teamIds) =>
-      console.log("📡 Joined Rooms:", teamIds)
-    );
+    socket.on("joinedRooms", (teamIds) => {
+      console.log("📡 Joined Rooms:", teamIds);
+    });
 
+    // ✅ When new team is created by admin or another user
     socket.on("team:created", (team) => {
       if (
         team.members.some(
@@ -37,21 +40,29 @@ export default function Dashboard() {
       }
     });
 
+    // ✅ When team member list or info updates
     socket.on("team:updated", ({ teamId, members }) => {
       setManagedTeams((prev) =>
-        prev.map((t) =>
-          t._id === teamId ? { ...t, members } : t
-        )
+        prev.map((t) => (t._id === teamId ? { ...t, members } : t))
       );
       setMemberTeams((prev) =>
-        prev.map((t) =>
-          t._id === teamId ? { ...t, members } : t
-        )
+        prev.map((t) => (t._id === teamId ? { ...t, members } : t))
       );
       showNotif("👥 Team member list updated", "info");
     });
 
-    return () => socket.disconnect();
+    // ✅ When a team gets deleted
+    socket.on("team:deleted", (teamId) => {
+      setManagedTeams((prev) => prev.filter((t) => t._id !== teamId));
+      setMemberTeams((prev) => prev.filter((t) => t._id !== teamId));
+      showNotif("❌ A team was deleted", "warning");
+    });
+
+    return () => {
+      socket.off("team:created");
+      socket.off("team:updated");
+      socket.off("team:deleted");
+    };
   }, [user?._id]);
 
   const fetchTeams = async () => {
@@ -78,7 +89,7 @@ export default function Dashboard() {
       const socket = getSocket();
       socket.emit("joinTeams", teams.map((t) => t._id));
     } catch (err) {
-      console.error(err);
+      console.error("❌ Failed to fetch teams:", err);
     }
   };
 
@@ -167,10 +178,7 @@ function CreateTeam({ onCreated }) {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        style={buttonPrimary}
-      >
+      <button onClick={() => setOpen(true)} style={buttonPrimary}>
         + Create Team
       </button>
 
@@ -226,10 +234,7 @@ function JoinTeam({ onJoined }) {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        style={buttonGreen}
-      >
+      <button onClick={() => setOpen(true)} style={buttonGreen}>
         + Join Team
       </button>
 
