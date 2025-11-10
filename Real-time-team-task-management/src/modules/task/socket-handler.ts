@@ -8,12 +8,16 @@ import Activity from "../../models/activity.model";
  * for connected socket users.
  */
 export default function registerTaskHandlers(io: Server, socket: Socket) {
-  const user = socket.data.user; // from auth middleware in socket.helper.ts
+  const user = socket.data.user;
 
   // ✅ User joins a team room
   socket.on("join_team_room", async (projectId: string) => {
     try {
-      const project = await Project.findById(projectId).select("team title");
+      // 👇 Tell TS that this doc has team & title fields
+      const project = await Project.findById(projectId).select("team title").lean() as
+        | { team: any; title?: string }
+        | null;
+
       if (!project) {
         return socket.emit("error_message", { message: "Project not found" });
       }
@@ -24,11 +28,10 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
 
       socket.emit("joined_room_success", {
         teamId,
-        projectTitle: project.title,
-        message: `Joined real-time room for ${project.title}`,
+        projectTitle: project.title || "Untitled",
+        message: `Joined real-time room for ${project.title || "Untitled"}`,
       });
 
-      // Notify others
       socket.to(teamId).emit("team_activity", {
         message: `${user.name} joined the project`,
         user: user.name,
@@ -40,7 +43,7 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
     }
   });
 
-  // ✅ Create Task in real-time
+  // ✅ Create Task
   socket.on("task_create", async (payload) => {
     try {
       const { projectId, title, description, priority, assignedTo } = payload;
@@ -49,7 +52,9 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
           message: "Project ID & title required",
         });
 
-      const project = await Project.findById(projectId).select("team");
+      const project = await Project.findById(projectId).select("team").lean() as
+        | { team: any }
+        | null;
       if (!project)
         return socket.emit("error_message", { message: "Project not found" });
 
@@ -67,7 +72,7 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
         team: project.team,
         actor: user.id,
         type: "task_created",
-        message: `${user.name} created task "${task.title}"`,
+        message: `${user.name} created task "${title}"`,
         meta: { taskId: task._id, projectId },
       });
 
@@ -79,44 +84,47 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
     }
   });
 
-  // ✅ Update Task in real-time
+  // ✅ Update Task
   socket.on("task_update", async ({ taskId, updates }) => {
     try {
       const before = await Task.findById(taskId);
       if (!before)
         return socket.emit("error_message", { message: "Task not found" });
 
-      const updated = await Task.findByIdAndUpdate(taskId, updates, {
-        new: true,
-      })
+      const updated = await Task.findByIdAndUpdate(taskId, updates, { new: true })
         .populate("assignedTo", "name email role")
         .populate("createdBy", "name email role");
 
-      const project = await Project.findById(updated!.project);
+      const project = await Project.findById(updated!.project).select("team").lean() as
+        | { team: any }
+        | null;
+
       const activity = await Activity.create({
-        team: project!.team,
+        team: project?.team,
         actor: user.id,
         type: "task_updated",
-        message: `${user.name} updated "${updated!.title}"`,
+        message: `${user.name} updated "${updated?.title || "Untitled"}"`,
         meta: { before, after: updated },
       });
 
       io.to(project!.team.toString()).emit("task_updated", { task: updated, activity });
-      console.log(`✏️ Task updated by ${user.email}: ${updated!.title}`);
+      console.log(`✏️ Task updated by ${user.email}: ${updated?.title}`);
     } catch (error) {
       console.error("task_update error:", error);
       socket.emit("error_message", { message: "Task update failed" });
     }
   });
 
-  // ✅ Delete Task in real-time
+  // ✅ Delete Task
   socket.on("task_delete", async (taskId: string) => {
     try {
       const task = await Task.findById(taskId);
       if (!task)
         return socket.emit("error_message", { message: "Task not found" });
 
-      const project = await Project.findById(task.project);
+      const project = await Project.findById(task.project).select("team").lean() as
+        | { team: any }
+        | null;
       await Task.findByIdAndDelete(taskId);
 
       const activity = await Activity.create({
@@ -135,22 +143,15 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
     }
   });
 
-  // ✅ Task Typing (for collaboration feedback)
+  // Typing indicators
   socket.on("task_typing", ({ taskId }) => {
-    socket.broadcast.emit("task_typing", {
-      taskId,
-      user: user.name,
-    });
+    socket.broadcast.emit("task_typing", { taskId, user: user.name });
   });
 
   socket.on("task_stop_typing", ({ taskId }) => {
-    socket.broadcast.emit("task_stop_typing", {
-      taskId,
-      user: user.name,
-    });
+    socket.broadcast.emit("task_stop_typing", { taskId, user: user.name });
   });
 
-  // ✅ Handle disconnect
   socket.on("disconnect", () => {
     console.log(`❌ ${user.email} disconnected`);
   });

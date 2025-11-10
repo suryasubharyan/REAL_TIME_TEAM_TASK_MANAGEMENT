@@ -1,7 +1,7 @@
 import http from "http";
 import app from "./app";
 import { initSocket } from "./config/socket";
-import initializeSocket, { getIO } from "./helpers/socket.helper.js";
+import initializeSocket, { getIO } from "./helpers/socket.helper";
 const PORT = process.env.PORT || 5000;
 
 // ✅ Create HTTP server for Socket.IO
