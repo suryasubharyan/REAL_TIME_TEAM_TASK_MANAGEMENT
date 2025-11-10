@@ -1,35 +1,64 @@
-// src/modules/task/socket-handler.ts
 import { Server, Socket } from "socket.io";
 import Project from "../../models/project.model";
 import Task from "../../models/task.model";
 import Activity from "../../models/activity.model";
 
+/**
+ * Handles all real-time task and project socket events
+ */
 export default function registerTaskHandlers(io: Server, socket: Socket) {
-  const user = socket.data.user || { _id: null, email: "anon", name: "Anonymous" };
+  const user = socket.data.user || {
+    _id: null,
+    email: "anonymous",
+    name: "Anonymous",
+  };
 
-  // Join team room (project -> team)
+  /* 🟢 USER JOINS TEAM ROOM (BASED ON PROJECT ID) */
   socket.on("join_team_room", async (projectId: string) => {
     try {
-      const project = await Project.findById(projectId).select("team title");
-      if (!project) return socket.emit("error_message", { message: "Project not found" });
+      const project = (await Project.findById(projectId).select(
+        "team title"
+      )) as any;
+
+      if (!project) {
+        return socket.emit("error_message", { message: "Project not found" });
+      }
 
       const teamId = project.team.toString();
       socket.join(teamId);
-      socket.emit("joined_room_success", { teamId, projectTitle: project.title });
-      socket.to(teamId).emit("team_activity", { message: `${user.name} joined`, user: user.name });
-    } catch (err) {
+
+      console.log(`👥 ${user.email} joined team room: ${teamId}`);
+
+      socket.emit("joined_room_success", {
+        teamId,
+        projectTitle: project.title || project.name || "Untitled",
+        message: `Joined room for project: ${project.title || project.name}`,
+      });
+
+      io.to(teamId).emit("team_activity", {
+        message: `${user.name} joined the project`,
+        user: user.name,
+        time: new Date(),
+      });
+    } catch (error) {
+      console.error("join_team_room error:", error);
       socket.emit("error_message", { message: "Failed to join room" });
     }
   });
 
-  // Create Task
+  /* 🆕 CREATE TASK */
   socket.on("task_create", async (payload) => {
     try {
       const { projectId, title, description, priority, assignedTo } = payload;
-      if (!projectId || !title) return socket.emit("error_message", { message: "Project & title required" });
+      if (!projectId || !title) {
+        return socket.emit("error_message", {
+          message: "Project ID and title required",
+        });
+      }
 
-      const project = await Project.findById(projectId).select("team");
-      if (!project) return socket.emit("error_message", { message: "Project not found" });
+      const project = (await Project.findById(projectId).select("team")) as any;
+      if (!project)
+        return socket.emit("error_message", { message: "Project not found" });
 
       const task = await Task.create({
         title,
@@ -51,62 +80,87 @@ export default function registerTaskHandlers(io: Server, socket: Socket) {
 
       const teamRoom = project.team.toString();
       io.to(teamRoom).emit("task_created", { task, activity });
-    } catch (err) {
-      console.error("task_create err", err);
-      socket.emit("error_message", { message: "Task create failed" });
+
+      console.log(`🆕 Task created by ${user.email}: ${title}`);
+    } catch (error) {
+      console.error("task_create error:", error);
+      socket.emit("error_message", { message: "Task creation failed" });
     }
   });
 
-  // Update Task
+  /* ✏️ UPDATE TASK */
   socket.on("task_update", async ({ taskId, updates }) => {
     try {
-      const before = await Task.findById(taskId);
-      if (!before) return socket.emit("error_message", { message: "Task not found" });
+      const before = (await Task.findById(taskId)) as any;
+      if (!before)
+        return socket.emit("error_message", { message: "Task not found" });
 
-      const updated = await Task.findByIdAndUpdate(taskId, updates, { new: true })
+      const updated = (await Task.findByIdAndUpdate(taskId, updates, {
+        new: true,
+      })
         .populate("assignedTo", "name email role")
-        .populate("createdBy", "name email role");
+        .populate("createdBy", "name email role")) as any;
 
-      const project = await Project.findById(updated!.project);
+      const project = (await Project.findById(updated!.project)) as any;
+
       const activity = await Activity.create({
-        team: project!.team,
+        team: project.team,
         actor: user._id,
         type: "task_updated",
-        message: `${user.name} updated "${updated!.title}"`,
+        message: `${user.name} updated task "${updated!.title}"`,
         meta: { before, after: updated },
       });
 
-      io.to(project!.team.toString()).emit("task_updated", { task: updated, activity });
-    } catch (err) {
-      console.error("task_update err", err);
+      io.to(project.team.toString()).emit("task_updated", {
+        task: updated,
+        activity,
+      });
+
+      console.log(`✏️ Task updated by ${user.email}: ${updated!.title}`);
+    } catch (error) {
+      console.error("task_update error:", error);
       socket.emit("error_message", { message: "Task update failed" });
     }
   });
 
-  // Delete
+  /* 🗑️ DELETE TASK */
   socket.on("task_delete", async (taskId: string) => {
     try {
-      const task = await Task.findById(taskId);
-      if (!task) return socket.emit("error_message", { message: "Task not found" });
-      const project = await Project.findById(task.project);
+      const task = (await Task.findById(taskId)) as any;
+      if (!task)
+        return socket.emit("error_message", { message: "Task not found" });
+
+      const project = (await Project.findById(task.project)) as any;
       await Task.findByIdAndDelete(taskId);
 
       const activity = await Activity.create({
-        team: project!.team,
+        team: project.team,
         actor: user._id,
         type: "task_deleted",
-        message: `${user.name} deleted "${task.title}"`,
+        message: `${user.name} deleted task "${task.title}"`,
         meta: { taskId },
       });
 
-      io.to(project!.team.toString()).emit("task_deleted", { taskId, activity });
-    } catch (err) {
-      console.error("task_delete err", err);
-      socket.emit("error_message", { message: "Task delete failed" });
+      io.to(project.team.toString()).emit("task_deleted", { taskId, activity });
+
+      console.log(`🗑️ Task deleted by ${user.email}: ${task.title}`);
+    } catch (error) {
+      console.error("task_delete error:", error);
+      socket.emit("error_message", { message: "Task deletion failed" });
     }
   });
 
-  // Typing indicators (optional)
-  socket.on("task_typing", ({ taskId }) => socket.broadcast.emit("task_typing", { taskId, user: user.name }));
-  socket.on("task_stop_typing", ({ taskId }) => socket.broadcast.emit("task_stop_typing", { taskId, user: user.name }));
+  /* 💬 TASK TYPING INDICATORS (optional collaboration feature) */
+  socket.on("task_typing", ({ taskId }) => {
+    socket.broadcast.emit("task_typing", { taskId, user: user.name });
+  });
+
+  socket.on("task_stop_typing", ({ taskId }) => {
+    socket.broadcast.emit("task_stop_typing", { taskId, user: user.name });
+  });
+
+  /* 🔴 DISCONNECT HANDLER */
+  socket.on("disconnect", (reason) => {
+    console.log(`❌ ${user.email} disconnected (${reason})`);
+  });
 }
