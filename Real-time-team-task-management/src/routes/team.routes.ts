@@ -9,12 +9,20 @@ import { protect } from "../middlewares/auth.middleware";
 
 const router = express.Router();
 
+// ✅ Create a new team
 router.post("/", protect, createTeam);
+
+// ✅ Get all teams of logged-in user
 router.get("/my", protect, getMyTeams);
+
+// ✅ Join a team by unique code
 router.post("/join", protect, joinTeam);
+
+// ✅ Get team by ID or teamCode
 router.get("/:teamId", protect, getTeamById);
 
 export default router;
+
 /**
  * @swagger
  * tags:

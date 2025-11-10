@@ -17,21 +17,24 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user?._id) return;
 
-    // Initialize once
-    const socket = initSocket();
+    let socket;
+    try {
+      socket = getSocket();
+    } catch {
+      socket = initSocket();
+    }
 
     socket.on("connect", () => {
       setSocketConnected(true);
       console.log("🟢 Socket connected:", socket.id);
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       setSocketConnected(false);
-      console.log("🔴 Socket disconnected");
+      console.warn("🔴 Socket disconnected:", reason);
     });
 
     socket.on("connect_error", (err) => {
-      setSocketConnected(false);
       console.error("⚠️ Socket connect error:", err.message);
     });
 
@@ -63,7 +66,6 @@ export default function Dashboard() {
       showNotif("❌ A team was deleted", "warning");
     });
 
-    // Fetch once user ready
     fetchTeams();
 
     return () => {
@@ -100,8 +102,7 @@ export default function Dashboard() {
       setMemberTeams(joined);
 
       const socket = getSocket();
-      if (!socket) return console.warn("⚠️ Socket not initialized yet");
-      socket.emit("joinTeams", teams.map((t) => t._id));
+      if (socket?.connected) socket.emit("joinTeams", teams.map((t) => t._id));
     } catch (err) {
       console.error("❌ Failed to fetch teams:", err);
     }
@@ -140,7 +141,6 @@ export default function Dashboard() {
             <h2 style={{ margin: 0 }}>
               {user?.role === "admin" ? "Managed Teams" : "Joined Teams"}
             </h2>
-            {/* ✅ Connection indicator */}
             <div
               title={socketConnected ? "Connected" : "Disconnected"}
               style={{
@@ -199,7 +199,7 @@ function CreateTeam({ onCreated }) {
       const res = await axios.post("/team", { name, description: desc });
       onCreated && onCreated(res.data.data);
       const socket = getSocket();
-      socket?.emit("team:created", res.data.data); // ✅ trigger real-time sync
+      socket?.emit("team:created", res.data.data);
       setOpen(false);
       setName("");
       setDesc("");
@@ -215,7 +215,6 @@ function CreateTeam({ onCreated }) {
       <button onClick={() => setOpen(true)} style={buttonPrimary}>
         + Create Team
       </button>
-
       {open && (
         <Modal onClose={() => setOpen(false)}>
           <h3 style={{ marginTop: 0 }}>Create Team</h3>
@@ -258,7 +257,7 @@ function JoinTeam({ onJoined }) {
       const res = await axios.post("/team/join", { code });
       onJoined && onJoined(res.data.data);
       const socket = getSocket();
-      socket?.emit("team:updated", { teamId: res.data.data._id }); // notify update
+      socket?.emit("team:updated", { teamId: res.data.data._id });
       setOpen(false);
       setCode("");
     } catch (err) {
@@ -273,7 +272,6 @@ function JoinTeam({ onJoined }) {
       <button onClick={() => setOpen(true)} style={buttonGreen}>
         + Join Team
       </button>
-
       {open && (
         <Modal onClose={() => setOpen(false)}>
           <h3 style={{ marginTop: 0 }}>Join a Team</h3>

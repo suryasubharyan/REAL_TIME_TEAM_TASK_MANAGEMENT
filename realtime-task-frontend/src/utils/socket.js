@@ -1,27 +1,44 @@
 import { io } from "socket.io-client";
 
-let socket;
+let socket = null;
+let isInitialized = false;
 
 export const initSocket = () => {
-  if (!socket) {
-    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
-    console.log("Initializing Socket.io at:", SOCKET_URL);
+  if (isInitialized && socket?.connected) return socket;
 
-    socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 3000,
-      reconnectionDelayMax: 8000,
-      timeout: 20000,
-    });
+  const backendURL =
+    import.meta.env.VITE_BACKEND_URL || "https://backend-g282.onrender.com";
 
-    socket.on("connect", () => console.log("🟢 Connected:", socket.id));
-    socket.on("disconnect", (reason) => console.warn("🔴 Disconnected:", reason));
-    socket.on("connect_error", (err) => console.error("⚠️ Connect error:", err.message));
-  }
+  console.log("🌐 Initializing Socket.io at:", backendURL);
+
+  socket = io(backendURL, {
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000,
+    withCredentials: true,
+  });
+
+  socket.on("connect", () => {
+    isInitialized = true;
+    console.log("🟢 Socket connected:", socket.id);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("🔴 Socket disconnected:", reason);
+  });
+
+  socket.on("connect_error", (err) => {
+    console.error("⚠️ Socket connect error:", err.message);
+  });
+
   return socket;
 };
 
-export const getSocket = () => socket;
+export const getSocket = () => {
+  if (!socket) {
+    alert("Socket.io not initialized!");
+    throw new Error("Socket.io not initialized!");
+  }
+  return socket;
+};

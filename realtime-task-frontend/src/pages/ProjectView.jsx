@@ -8,7 +8,7 @@ import TaskCard from "../components/TaskCard";
 import Notification from "../components/Notification";
 import CreateTaskModal from "../components/CreateTaskModal";
 import { useAuth } from "../context/AuthContext";
-import { getSocket, initSocket } from "../utils/socket";
+import { initSocket, getSocket } from "../utils/socket";
 
 export default function ProjectView() {
   const { teamId } = useParams();
@@ -26,46 +26,58 @@ export default function ProjectView() {
   const [editTask, setEditTask] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
 
-  // ✅ Initialize socket safely
+  /* ✅ Initialize socket safely */
   useEffect(() => {
-    const socket = getSocket() || initSocket();
+    let socket;
+    try {
+      socket = getSocket();
+    } catch {
+      socket = initSocket();
+    }
 
-    if (socket && !socket.listeners("connect").length) {
+    if (socket && !socket.hasListeners?.("connect")) {
       socket.on("connect", () => {
         setSocketConnected(true);
         console.log("🟢 Socket connected:", socket.id);
       });
 
-      socket.on("disconnect", () => {
+      socket.on("disconnect", (reason) => {
         setSocketConnected(false);
-        console.warn("🔴 Socket disconnected");
+        console.warn("🔴 Socket disconnected:", reason);
+      });
+
+      socket.on("connect_error", (err) => {
+        setSocketConnected(false);
+        console.error("⚠️ Socket connection error:", err.message);
       });
     }
 
-    return () => {
-      if (socket) {
-        socket.off("connect");
-        socket.off("disconnect");
-      }
-    };
-  }, []);
+    // ✅ Join the team room for real-time sync
+    socket.emit("joinTeams", [teamId]);
 
-  // ✅ Socket listeners for task & activity updates
+    return () => {
+      socket?.off("connect");
+      socket?.off("disconnect");
+      socket?.off("connect_error");
+    };
+  }, [teamId]);
+
+  /* ✅ Handle real-time task/activity updates */
   useTeamSocket(teamId, {
     task_created: (d) => {
       if (d?.task?.project === activeProject?._id) {
-        setTasks((t) => [d.task, ...t]);
+        setTasks((prev) => [d.task, ...prev]);
         showNotif(`🆕 New task added: ${d.task.title}`, "info");
       }
     },
     task_updated: (d) => {
       if (d?.task?.project === activeProject?._id) {
-        setTasks((t) => t.map((x) => (x._id === d.task._id ? d.task : x)));
+        setTasks((prev) => prev.map((t) => (t._id === d.task._id ? d.task : t)));
         showNotif(`✏️ Task updated: ${d.task.title}`, "success");
       }
     },
     task_deleted: (d) => {
-      setTasks((t) => t.filter((x) => x._id !== d.taskId));
+      setTasks((prev) => prev.filter((t) => t._id !== d.taskId));
       showNotif("🗑️ Task deleted", "warning");
     },
     activity_created: (d) => {
@@ -74,7 +86,7 @@ export default function ProjectView() {
     },
   });
 
-  // ✅ Fetch projects on mount
+  /* ✅ Fetch projects on mount */
   useEffect(() => {
     (async () => {
       try {
@@ -100,7 +112,7 @@ export default function ProjectView() {
     })();
   }, [teamId]);
 
-  // ✅ Fetch tasks + activities when active project changes
+  /* ✅ Fetch tasks + activities when active project changes */
   useEffect(() => {
     (async () => {
       if (!activeProject) {
@@ -122,7 +134,7 @@ export default function ProjectView() {
     })();
   }, [activeProject]);
 
-  // ✅ Helpers
+  /* ✅ Helpers */
   const showNotif = (message, type = "info") => {
     setNotif({ message, type });
     setTimeout(() => setNotif(null), 3000);
@@ -139,7 +151,7 @@ export default function ProjectView() {
     showNotif("✅ Task saved successfully!", "success");
   };
 
-  // ✅ UI
+  /* ✅ UI */
   return (
     <div style={{ minHeight: "100vh", background: "#F9FAFB" }}>
       <Navbar />
@@ -176,7 +188,6 @@ export default function ProjectView() {
             ))}
           </div>
 
-          {/* ✅ Only Admins can create projects */}
           {user?.role === "admin" && (
             <CreateProject teamId={teamId} onCreated={onProjectCreated} />
           )}
@@ -305,11 +316,13 @@ function CreateProject({ teamId, onCreated }) {
         description: desc,
       });
       onCreated && onCreated(res.data.data);
+      const socket = getSocket();
+      socket?.emit("project:created", res.data.data);
       setOpen(false);
       setName("");
       setDesc("");
     } catch (err) {
-      console.error(err);
+      console.error("❌ Project creation failed:", err);
       alert(err?.response?.data?.message || "Failed to create project");
     } finally {
       setLoading(false);

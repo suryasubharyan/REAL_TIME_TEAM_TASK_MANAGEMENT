@@ -10,13 +10,20 @@ import {
 
 const router = express.Router();
 
-// ✅ Create Project (Admin only)
-router.post("/", protect, allowRoles("admin"), validateDTO(CreateProjectDTO), createProject);
+// ✅ Create new project under a team (admin only)
+router.post(
+  "/",
+  protect,
+  allowRoles("admin"),
+  validateDTO(CreateProjectDTO),
+  createProject
+);
 
-// ✅ Get All Projects for a Team
+// ✅ Get all projects for a team (teamId from URL param)
 router.get("/team/:teamId", protect, getProjectsByTeam);
 
 export default router;
+
 /**
  * @swagger
  * tags:
