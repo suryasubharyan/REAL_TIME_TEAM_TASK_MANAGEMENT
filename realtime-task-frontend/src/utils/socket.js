@@ -31,3 +31,7 @@ export function initSocket() {
 export function getSocket() {
   return socket;
 }
+export const closeSocket = () => {
+  if (socket) socket.disconnect();
+  socket = null;
+};
