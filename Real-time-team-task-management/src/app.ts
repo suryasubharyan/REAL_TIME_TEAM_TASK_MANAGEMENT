@@ -19,7 +19,7 @@ connectDB();
 const app = express();
 app.use(cors({
   origin: [
-    "https://frontend-isaq.onrender.com/", // 🧠 replace with your actual Vercel URL
+    "https://frontend-isaq.onrender.com", // 🧠 replace with your actual Vercel URL
     "http://localhost:5173", // optional: for local testing (Vite)
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
