@@ -3,25 +3,27 @@ import http from "http";
 import registerTaskHandlers from "../modules/task/socket-handler";
 import registerTeamHandlers from "../modules/team/socket-handler";
 
+let io: Server; // ✅ Keep a global reference
+
 const initializeSocket = (server: http.Server) => {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {
       origin: [
-        "https://frontend-isaq.onrender.com", // ✅ your deployed frontend
-        "http://localhost:5173",              // ✅ dev mode
+        "https://frontend-isaq.onrender.com", // deployed frontend
+        "http://localhost:5173",              // local dev
       ],
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true,
     },
-    transports: ["websocket", "polling"], // ✅ fallback for Render proxy
-    pingInterval: 25000, // ✅ keep connection alive
+    transports: ["websocket", "polling"], // ✅ fallback for Render
+    pingInterval: 25000,
     pingTimeout: 60000,
   });
 
   io.on("connection", (socket) => {
     console.log(`🟢 Socket connected: ${socket.id}`);
 
-    // Register all module socket handlers
+    // Register your team & task socket modules
     registerTeamHandlers(io, socket);
     registerTaskHandlers(io, socket);
 
@@ -30,6 +32,12 @@ const initializeSocket = (server: http.Server) => {
     });
   });
 
+  return io;
+};
+
+// ✅ This helper allows other files (like controllers) to emit events
+export const getIO = () => {
+  if (!io) throw new Error("Socket.io not initialized!");
   return io;
 };
 
