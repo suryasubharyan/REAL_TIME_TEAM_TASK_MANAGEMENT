@@ -4,7 +4,7 @@ import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
 import { connectDB } from "./config/database";
-
+import cors from "cors";
 import authRoutes from "./routes/auth.routes";
 import teamRoutes from "./routes/team.routes";
 import projectRoutes from "./routes/project.routes";
@@ -18,31 +18,47 @@ connectDB();
 // ✅ Initialize Express
 const app = express();
 
-// ✅ Allowed origins (Frontend URLs)
+// ✅ Allowed frontend origins
 const allowedOrigins = [
-  "https://frontend-isaq.onrender.com", // your frontend hosted on Render
-  "http://localhost:5173",              // local dev
+  "https://frontend-isaq.onrender.com", // your deployed frontend
+  "http://localhost:5173",              // Vite default dev port
+  "http://localhost:5174",              // alt port (Edge or VSCode preview)
+  "http://127.0.0.1:5173",              // optional localhost variant
 ];
-// ✅ Keep WebSocket connections alive on Render
-app.set("trust proxy", 1);
 
-// ✅ Apply CORS manually (Render-safe)
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
+// ✅ CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked from origin: ${origin}`));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  exposedHeaders: ["Authorization"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204); // Preflight success
-  }
-  next();
-});
+// ✅ Use CORS before JSON parsing
+app.use(cors(corsOptions));
 
+// ✅ Express body parser
 app.use(express.json());
+
+// ✅ Optional preflight handler for any route
+app.options("*", cors(corsOptions));
 
 // ✅ Load Swagger YAML file safely
 const swaggerPath = path.join(__dirname, "../swagger.yaml");
