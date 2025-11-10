@@ -17,7 +17,15 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://real-time-team-task-management-frontend.vercel.app", // 🧠 replace with your actual Vercel URL
+    "http://localhost:5173", // optional: for local testing (Vite)
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // ✅ Load Swagger YAML file safely
