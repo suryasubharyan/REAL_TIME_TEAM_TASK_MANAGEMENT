@@ -1,6 +1,5 @@
 import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
@@ -19,33 +18,28 @@ connectDB();
 // ✅ Initialize Express
 const app = express();
 
-// ✅ Allowed origins
+// ✅ Allowed origins (Frontend URLs)
 const allowedOrigins = [
-  "https://frontend-isaq.onrender.com", // your deployed frontend on Render
-  "http://localhost:5173",              // local Vite dev environment
+  "https://frontend-isaq.onrender.com", // your frontend hosted on Render
+  "http://localhost:5173",              // local dev
 ];
 
-// ✅ Proper CORS setup
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn("❌ Blocked by CORS:", origin);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+// ✅ Apply CORS manually (Render-safe)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
 
-// ✅ Handle Preflight Requests
-app.options("*", cors());
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204); // Preflight success
+  }
+  next();
+});
 
-// ✅ Parse incoming JSON
 app.use(express.json());
 
 // ✅ Load Swagger YAML file safely
