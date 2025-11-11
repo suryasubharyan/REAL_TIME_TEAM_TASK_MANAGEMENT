@@ -7,8 +7,8 @@ export const initSocket = (token) => {
   if (isInitialized && socket?.connected) return socket;
 
   const backendURL =
-    import.meta.env.VITE_BACKEND_URL?.replace("/api", "") ||
-    "http://localhost:5000";
+    import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
+    "";
 
   console.log("🌐 Initializing Socket.io at:", backendURL);
 
