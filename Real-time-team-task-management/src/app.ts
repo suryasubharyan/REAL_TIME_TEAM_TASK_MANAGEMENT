@@ -1,9 +1,7 @@
 import express, { Request, Response } from "express";
 import dotenv from "dotenv";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yamljs";
-import path from "path";
 import cors, { CorsOptions } from "cors";
+import path from "path";
 import { connectDB } from "./config/database";
 
 import authRoutes from "./routes/auth.routes";
@@ -11,6 +9,9 @@ import teamRoutes from "./routes/team.routes";
 import projectRoutes from "./routes/project.routes";
 import taskRoutes from "./routes/task.routes";
 import activityRoutes from "./routes/activity.routes";
+
+// ✅ Import Swagger setup (auto-docs from your routes)
+import swaggerDocs from "./config/swagger";
 
 dotenv.config();
 
@@ -23,9 +24,9 @@ const app = express();
 // ✅ Allowed frontend origins
 const allowedOrigins = [
   "https://frontend-isaq.onrender.com", // deployed frontend
-  "http://localhost:5173",              // Vite default dev port
-  "http://localhost:5174",              // Edge or VSCode preview
-  "http://127.0.0.1:5173",              // optional localhost variant
+  "http://localhost:5173",              // Vite dev port
+  "http://localhost:5174",              // alternate dev
+  "http://127.0.0.1:5173",
 ];
 
 // ✅ Type-safe CORS configuration
@@ -34,13 +35,9 @@ const corsOptions: CorsOptions = {
     origin: string | undefined,
     callback: (err: Error | null, allow?: boolean) => void
   ): void {
-    // Allow requests without origin (like Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked from origin: ${origin}`));
-    }
+    if (!origin) return callback(null, true); // allow Postman, internal
+    if (allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error(`CORS blocked from origin: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -58,30 +55,29 @@ const corsOptions: CorsOptions = {
 
 // ✅ Use CORS before JSON parsing
 app.use(cors(corsOptions));
-
-// ✅ Express body parser
 app.use(express.json());
 
-// ✅ Optional preflight handler for any route
+// ✅ Optional preflight handler for socket.io and all routes
 app.options("*", cors(corsOptions));
 app.options("/socket.io/*", cors(corsOptions));
-// ✅ Load Swagger YAML file safely
-const swaggerPath = path.join(__dirname, "../swagger.yaml");
-const swaggerDoc = YAML.load(swaggerPath);
 
-// ✅ Swagger Documentation
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
-
-// ✅ Main API routes
+// ✅ API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/project", projectRoutes);
 app.use("/api/task", taskRoutes);
 app.use("/api/activity", activityRoutes);
 
+// ✅ Swagger Documentation (auto-generated from JSDoc)
+swaggerDocs(app);
+
 // ✅ Health Check route
 app.get("/", (_: Request, res: Response) => {
-  res.send("✅ Real-Time Team Task Management API is running...");
+  res.send(`
+    <h2>✅ Real-Time Team Task Management API</h2>
+    <p>Server is running successfully.</p>
+    <p>Visit <a href="/api/docs">/api/docs</a> to explore the API documentation.</p>
+  `);
 });
 
 export default app;

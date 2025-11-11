@@ -5,56 +5,66 @@ import Activity from "../models/activity.model";
 const router = express.Router();
 
 /**
- * ✅ Get all activities for a given project or team
- * Supports:
- *   - /api/activity/project/:projectId
- *   - /api/activity/team/:teamId
+ * @swagger
+ * tags:
+ *   name: Activity
+ *   description: Logs and activity tracking
  */
 
-// Get by project
+/**
+ * @swagger
+ * /api/activity/project/{projectId}:
+ *   get:
+ *     summary: Get project activity history
+ *     description: Accessible by **both admins and members** belonging to that project.
+ *     tags: [Activity]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of project activities
+ */
+
+/**
+ * @swagger
+ * /api/activity/team/{teamId}:
+ *   get:
+ *     summary: Get activity history of a team
+ *     description: Accessible by **admins and members** of the team.
+ *     tags: [Activity]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: teamId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of team-level activities
+ */
+
 router.get("/project/:projectId", protect, async (req, res) => {
-  try {
-    const { projectId } = req.params;
-
-    const activities = await Activity.find({ "meta.projectId": projectId })
-      .sort({ createdAt: -1 })
-      .populate("actor", "name email role")
-      .lean();
-
-    res.status(200).json({
-      success: true,
-      activities,
-    });
-  } catch (error) {
-    console.error("❌ Error fetching activities by project:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch activities",
-    });
-  }
+  const { projectId } = req.params;
+  const activities = await Activity.find({ "meta.projectId": projectId })
+    .sort({ createdAt: -1 })
+    .populate("actor", "name email role");
+  res.json({ success: true, activities });
 });
 
-// Optional: Get all activities for a team
 router.get("/team/:teamId", protect, async (req, res) => {
-  try {
-    const { teamId } = req.params;
-
-    const activities = await Activity.find({ team: teamId })
-      .sort({ createdAt: -1 })
-      .populate("actor", "name email role")
-      .lean();
-
-    res.status(200).json({
-      success: true,
-      activities,
-    });
-  } catch (error) {
-    console.error("❌ Error fetching activities by team:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch activities",
-    });
-  }
+  const { teamId } = req.params;
+  const activities = await Activity.find({ team: teamId })
+    .sort({ createdAt: -1 })
+    .populate("actor", "name email role");
+  res.json({ success: true, activities });
 });
 
 export default router;

@@ -1,27 +1,8 @@
 import express from "express";
-import {
-  createTeam,
-  getMyTeams,
-  joinTeam,
-  getTeamById,
-} from "../controllers/team.controller";
+import { createTeam, getMyTeams, joinTeam, getTeamById } from "../controllers/team.controller";
 import { protect } from "../middlewares/auth.middleware";
 
 const router = express.Router();
-
-// ✅ Create a new team
-router.post("/", protect, createTeam);
-
-// ✅ Get all teams of logged-in user
-router.get("/my", protect, getMyTeams);
-
-// ✅ Join a team by unique code
-router.post("/join", protect, joinTeam);
-
-// ✅ Get team by ID or teamCode
-router.get("/:teamId", protect, getTeamById);
-
-export default router;
 
 /**
  * @swagger
@@ -35,6 +16,7 @@ export default router;
  * /api/team:
  *   post:
  *     summary: Create a new team
+ *     description: Only **admins** can create new teams.
  *     tags: [Team]
  *     security:
  *       - bearerAuth: []
@@ -44,34 +26,43 @@ export default router;
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [name]
  *             properties:
  *               name:
  *                 type: string
+ *                 example: Backend Ninjas
  *               description:
  *                 type: string
+ *                 example: Handles backend microservices
  *     responses:
  *       201:
  *         description: Team created successfully
+ *       401:
+ *         description: Unauthorized
  */
 
 /**
  * @swagger
  * /api/team/my:
  *   get:
- *     summary: Get all teams for the logged-in user
+ *     summary: Get all teams joined by the logged-in user
+ *     description: Accessible by **both admins and members**.
  *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of user's teams
+ *         description: List of teams the user belongs to
+ *       401:
+ *         description: Unauthorized
  */
 
 /**
  * @swagger
  * /api/team/join:
  *   post:
- *     summary: Join a team using a code
+ *     summary: Join a team via join code
+ *     description: Accessible by **members** to join an existing team.
  *     tags: [Team]
  *     security:
  *       - bearerAuth: []
@@ -81,30 +72,44 @@ export default router;
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [code]
  *             properties:
  *               code:
  *                 type: string
+ *                 example: TEAM-9FA28B
  *     responses:
  *       200:
- *         description: Successfully joined the team
+ *         description: Joined team successfully
+ *       404:
+ *         description: Team not found
  */
 
 /**
  * @swagger
  * /api/team/{teamId}:
  *   get:
- *     summary: Get details of a team by ID or code
+ *     summary: Get team details by ID or team code
+ *     description: Accessible by **both admins and members**.
  *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: teamId
+ *       - name: teamId
+ *         in: path
  *         required: true
  *         schema:
  *           type: string
- *         description: ID or code of the team
+ *         description: Team Mongo ID or code
  *     responses:
  *       200:
- *         description: Team details
+ *         description: Team details fetched
+ *       404:
+ *         description: Team not found
  */
+
+router.post("/", protect, createTeam);
+router.get("/my", protect, getMyTeams);
+router.post("/join", protect, joinTeam);
+router.get("/:teamId", protect, getTeamById);
+
+export default router;
