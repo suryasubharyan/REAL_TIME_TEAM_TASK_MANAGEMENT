@@ -7,19 +7,19 @@ export const initSocket = (token) => {
   if (isInitialized && socket?.connected) return socket;
 
   const backendURL =
-    import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
-    "";
+    import.meta.env.VITE_SOCKET_URL?.replace("/api", "") ||
+    "https://backend-g282.onrender.com";
 
   console.log("🌐 Initializing Socket.io at:", backendURL);
 
   socket = io(backendURL, {
-    path: "/socket.io",
+    path: "/socket.io", // ✅ matches backend
     transports: ["websocket", "polling"],
     withCredentials: true,
-    auth: { token }, // ✅ JWT auth sent here
+    auth: { token },
     reconnection: true,
     reconnectionAttempts: 10,
-    reconnectionDelay: 1500,
+    reconnectionDelay: 2000,
   });
 
   socket.on("connect", () => {

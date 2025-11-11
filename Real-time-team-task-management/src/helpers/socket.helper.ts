@@ -14,50 +14,48 @@ const initializeSocket = (server: http.Server) => {
         "http://localhost:5173",
         "http://localhost:5174",
       ],
-      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+      allowedHeaders: ["Authorization", "Content-Type"],
     },
-    transports: ["websocket", "polling"], // ✅ ensures Render fallback
-    path: "/socket.io", // ✅ explicit path
-    pingInterval: 25000,
+    path: "/socket.io", // ✅ same path as frontend
+    transports: ["websocket", "polling"],
+    pingInterval: 25000, // ✅ keep-alive ping for Render
     pingTimeout: 60000,
   });
 
-  // ✅ JWT Authentication Middleware for Sockets
+  // 🔐 JWT verification for socket connections
   io.use((socket, next) => {
-  try {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Unauthorized"));
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
-    socket.data.user = { _id: decoded._id, email: decoded.email };
-    next();
-  } catch (err: any) {
-    console.error("❌ Socket Auth Error:", err.message);
-    next(new Error("Unauthorized"));
-  }
-});
+    try {
+      const token = socket.handshake.auth?.token;
+      if (!token) return next(new Error("Unauthorized"));
+      const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
+      socket.data.user = { _id: decoded._id, email: decoded.email };
+      next();
+    } catch (err: any) {
+      console.error("❌ Socket Auth Error:", err.message);
+      next(new Error("Unauthorized"));
+    }
+  });
 
-
-  // ✅ On Connection
   io.on("connection", (socket: Socket) => {
     const user = socket.data.user;
-    console.log(`🟢 Socket connected: ${user?.email || "guest"} (${socket.id})`);
+    console.log(`🟢 Connected: ${user?.email || "guest"} (${socket.id})`);
 
-    // Register modular socket handlers
     registerTeamHandlers(io, socket);
     registerTaskHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
-      console.log(`🔴 Socket disconnected (${reason}) - ${user?.email || "unknown"}`);
+      console.log(`🔴 Disconnected (${reason}) - ${user?.email || "unknown"}`);
     });
   });
 
-  // Optional keepalive ping (prevents Render from idling)
+  // 🩵 Keep Render from idling the socket
   setInterval(() => {
     io.emit("ping", { time: new Date().toISOString() });
   }, 25000);
 
-  console.log("✅ Socket.IO initialized successfully (Render-safe)");
+  console.log("✅ Socket.IO initialized successfully for Render");
   return io;
 };
 
