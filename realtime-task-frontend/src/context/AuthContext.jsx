@@ -4,9 +4,14 @@ import { initSocket } from "../utils/socket";
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("user") || "null")
-  );
+  const [user, setUser] = useState(() => {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw && raw !== "undefined" ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+});
   const [token, setToken] = useState(localStorage.getItem("token") || null);
 
   useEffect(() => {
