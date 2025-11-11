@@ -4,14 +4,17 @@ import initializeSocket from "./helpers/socket.helper";
 
 const PORT = process.env.PORT || 5000;
 
-// ✅ Create HTTP server
+// ✅ Create server
 const server = http.createServer(app);
 
-// ✅ Initialize WebSocket (only once)
+// ✅ Trust proxy (important for Render)
+app.set("trust proxy", 1);
+
+// ✅ Initialize socket
 initializeSocket(server);
 
-// ✅ Start listening
+// ✅ Start server
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📘 Swagger Docs available at http://localhost:${PORT}/api/docs`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📘 Swagger Docs: /api/docs`);
 });

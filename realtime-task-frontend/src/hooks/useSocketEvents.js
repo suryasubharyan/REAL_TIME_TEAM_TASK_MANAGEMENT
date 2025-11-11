@@ -25,33 +25,33 @@ export default function useSocketEvents({
     // === TEAM EVENTS ===
     socket.on("team:created", (team) => {
       console.log("📡 team:created", team);
-      onTeamCreated && onTeamCreated(team);
+      onTeamCreated?.(team);
     });
 
     socket.on("team:updated", (payload) => {
       console.log("📡 team:updated", payload);
-      onTeamUpdated && onTeamUpdated(payload);
+      onTeamUpdated?.(payload);
     });
 
     socket.on("team:deleted", (teamId) => {
       console.log("📡 team:deleted", teamId);
-      onTeamDeleted && onTeamDeleted(teamId);
+      onTeamDeleted?.(teamId);
     });
 
     // === TASK EVENTS ===
     socket.on("task_created", (data) => {
       console.log("📡 task_created", data);
-      onTaskCreated && onTaskCreated(data.task, data.activity);
+      onTaskCreated?.(data.task, data.activity);
     });
 
     socket.on("task_updated", (data) => {
       console.log("📡 task_updated", data);
-      onTaskUpdated && onTaskUpdated(data.task, data.activity);
+      onTaskUpdated?.(data.task, data.activity);
     });
 
     socket.on("task_deleted", (data) => {
       console.log("📡 task_deleted", data);
-      onTaskDeleted && onTaskDeleted(data.taskId, data.activity);
+      onTaskDeleted?.(data.taskId, data.activity);
     });
 
     return () => {

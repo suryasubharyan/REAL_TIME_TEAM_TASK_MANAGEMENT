@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import crypto from "crypto";
 import Team from "../models/team.model";
 import { AuthRequest } from "../middlewares/auth.middleware";
-import { getIO } from "../config/socket";
+import { getIO } from "../helpers/socket.helper";
 
 /* ============================================================
    ✅ Create Team

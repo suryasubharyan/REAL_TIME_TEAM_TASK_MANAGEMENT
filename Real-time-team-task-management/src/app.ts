@@ -64,7 +64,7 @@ app.use(express.json());
 
 // ✅ Optional preflight handler for any route
 app.options("*", cors(corsOptions));
-
+app.options("/socket.io/*", cors(corsOptions));
 // ✅ Load Swagger YAML file safely
 const swaggerPath = path.join(__dirname, "../swagger.yaml");
 const swaggerDoc = YAML.load(swaggerPath);

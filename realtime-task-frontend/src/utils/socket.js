@@ -3,20 +3,23 @@ import { io } from "socket.io-client";
 let socket = null;
 let isInitialized = false;
 
-export const initSocket = () => {
+export const initSocket = (token) => {
   if (isInitialized && socket?.connected) return socket;
 
   const backendURL =
-    import.meta.env.VITE_BACKEND_URL || "https://backend-g282.onrender.com";
+    import.meta.env.VITE_BACKEND_URL?.replace("/api", "") ||
+    "http://localhost:5000";
 
   console.log("🌐 Initializing Socket.io at:", backendURL);
 
   socket = io(backendURL, {
+    path: "/socket.io",
     transports: ["websocket", "polling"],
+    withCredentials: true,
+    auth: { token }, // ✅ JWT auth sent here
     reconnection: true,
     reconnectionAttempts: 10,
-    reconnectionDelay: 2000,
-    withCredentials: true,
+    reconnectionDelay: 1500,
   });
 
   socket.on("connect", () => {
@@ -25,7 +28,7 @@ export const initSocket = () => {
   });
 
   socket.on("disconnect", (reason) => {
-    console.log("🔴 Socket disconnected:", reason);
+    console.warn("🔴 Socket disconnected:", reason);
   });
 
   socket.on("connect_error", (err) => {
@@ -36,9 +39,9 @@ export const initSocket = () => {
 };
 
 export const getSocket = () => {
-  if (!socket) {
-    alert("Socket.io not initialized!");
-    throw new Error("Socket.io not initialized!");
+  if (!socket || !isInitialized) {
+    console.warn("⚠️ Socket.io not initialized yet!");
+    return null;
   }
   return socket;
 };

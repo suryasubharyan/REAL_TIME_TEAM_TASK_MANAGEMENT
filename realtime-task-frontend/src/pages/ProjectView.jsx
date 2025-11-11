@@ -2,18 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import axios from "../api/axios";
-import { useTeamSocket } from "../hooks/useTeamSocket";
 import ProjectCard from "../components/ProjectCard";
 import TaskCard from "../components/TaskCard";
 import Notification from "../components/Notification";
 import CreateTaskModal from "../components/CreateTaskModal";
 import { useAuth } from "../context/AuthContext";
-import { initSocket, getSocket } from "../utils/socket";
+import { useSocket } from "../context/SocketContext";
+import { useTeamSocket } from "../hooks/useTeamSocket";
 
 export default function ProjectView() {
   const { teamId } = useParams();
   const location = useLocation();
   const { user } = useAuth();
+  const socket = useSocket();
 
   const stateTeam = location.state?.team;
   const [team, setTeam] = useState(stateTeam || null);
@@ -26,85 +27,56 @@ export default function ProjectView() {
   const [editTask, setEditTask] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
 
-  /* ✅ Initialize socket safely */
+  // ✅ Socket connection and join room
   useEffect(() => {
-    let socket;
-    try {
-      socket = getSocket();
-    } catch {
-      socket = initSocket();
-    }
+    if (!socket) return;
 
-    if (socket && !socket.hasListeners?.("connect")) {
-      socket.on("connect", () => {
-        setSocketConnected(true);
-        console.log("🟢 Socket connected:", socket.id);
-      });
+    const handleConnect = () => {
+      setSocketConnected(true);
+      socket.emit("joinTeams", [teamId]);
+      console.log("🟢 Joined team room:", teamId);
+    };
+    const handleDisconnect = () => setSocketConnected(false);
 
-      socket.on("disconnect", (reason) => {
-        setSocketConnected(false);
-        console.warn("🔴 Socket disconnected:", reason);
-      });
-
-      socket.on("connect_error", (err) => {
-        setSocketConnected(false);
-        console.error("⚠️ Socket connection error:", err.message);
-      });
-    }
-
-    // ✅ Join the team room for real-time sync
-    socket.emit("joinTeams", [teamId]);
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
 
     return () => {
-      socket?.off("connect");
-      socket?.off("disconnect");
-      socket?.off("connect_error");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
     };
-  }, [teamId]);
+  }, [socket, teamId]);
 
-  /* ✅ Handle real-time task/activity updates */
+  // ✅ Real-time updates
   useTeamSocket(teamId, {
     task_created: (d) => {
-      if (d?.task?.project === activeProject?._id) {
+      if (d?.task?.project === activeProject?._id)
         setTasks((prev) => [d.task, ...prev]);
-        showNotif(`🆕 New task added: ${d.task.title}`, "info");
-      }
     },
     task_updated: (d) => {
-      if (d?.task?.project === activeProject?._id) {
+      if (d?.task?.project === activeProject?._id)
         setTasks((prev) => prev.map((t) => (t._id === d.task._id ? d.task : t)));
-        showNotif(`✏️ Task updated: ${d.task.title}`, "success");
-      }
     },
-    task_deleted: (d) => {
-      setTasks((prev) => prev.filter((t) => t._id !== d.taskId));
-      showNotif("🗑️ Task deleted", "warning");
-    },
-    activity_created: (d) => {
-      setActivities((a) => [d.activity, ...a]);
-      if (d?.activity?.message) showNotif(d.activity.message, "info");
-    },
+    task_deleted: (d) =>
+      setTasks((prev) => prev.filter((t) => t._id !== d.taskId)),
   });
 
-  /* ✅ Fetch projects on mount */
+  // ✅ Fetch team + projects
   useEffect(() => {
     (async () => {
       try {
         if (!team) {
-          const teamsRes = await axios.get("/team/my");
-          const found = teamsRes.data.teams?.find((t) => t._id === teamId);
+          const res = await axios.get("/team/my");
+          const found = res.data.teams?.find((t) => t._id === teamId);
           if (found) setTeam(found);
         }
-
-        const res = await axios.get(`/project/team/${teamId}`);
-        const projectList = res.data.projects || [];
-        setProjects(projectList);
-
-        if (projectList.length) {
-          const lastProjId = localStorage.getItem("lastProjectId");
-          const selected =
-            projectList.find((p) => p._id === lastProjId) || projectList[0];
-          setActiveProject(selected);
+        const res2 = await axios.get(`/project/team/${teamId}`);
+        const list = res2.data.projects || [];
+        setProjects(list);
+        if (list.length) {
+          const saved = localStorage.getItem("lastProjectId");
+          const sel = list.find((p) => p._id === saved) || list[0];
+          setActiveProject(sel);
         }
       } catch (err) {
         console.error("❌ Project fetch failed:", err);
@@ -112,29 +84,23 @@ export default function ProjectView() {
     })();
   }, [teamId]);
 
-  /* ✅ Fetch tasks + activities when active project changes */
+  // ✅ Fetch tasks + activities
   useEffect(() => {
     (async () => {
-      if (!activeProject) {
-        setTasks([]);
-        setActivities([]);
-        return;
-      }
-
+      if (!activeProject) return;
       try {
         localStorage.setItem("lastProjectId", activeProject._id);
         const t = await axios.get(`/task/project/${activeProject._id}`);
         setTasks(t.data.tasks || []);
-
-        const act = await axios.get(`/activity/project/${activeProject._id}`);
-        setActivities(act.data.activities || []);
+        const a = await axios.get(`/activity/project/${activeProject._id}`);
+        setActivities(a.data.activities || []);
       } catch (err) {
         console.error("❌ Task or Activity fetch failed:", err);
       }
     })();
   }, [activeProject]);
 
-  /* ✅ Helpers */
+  // ✅ Helpers
   const showNotif = (message, type = "info") => {
     setNotif({ message, type });
     setTimeout(() => setNotif(null), 3000);
@@ -144,6 +110,7 @@ export default function ProjectView() {
     setProjects((prev) => [proj, ...prev]);
     setActiveProject(proj);
     showNotif("✅ Project created successfully", "success");
+    socket?.emit("project:created", proj);
   };
 
   const onTaskCreated = (task) => {
@@ -151,7 +118,7 @@ export default function ProjectView() {
     showNotif("✅ Task saved successfully!", "success");
   };
 
-  /* ✅ UI */
+  // ✅ UI
   return (
     <div style={{ minHeight: "100vh", background: "#F9FAFB" }}>
       <Navbar />
@@ -177,66 +144,37 @@ export default function ProjectView() {
             <small style={{ color: "#6B7280" }}>{team?.name}</small>
           </div>
 
-          <div>
-            {projects.map((p) => (
-              <ProjectCard
-                key={p._id}
-                project={p}
-                active={activeProject?._id === p._id}
-                onClick={(pr) => setActiveProject(pr)}
-              />
-            ))}
-          </div>
+          {projects.map((p) => (
+            <ProjectCard
+              key={p._id}
+              project={p}
+              active={activeProject?._id === p._id}
+              onClick={(pr) => setActiveProject(pr)}
+            />
+          ))}
 
           {user?.role === "admin" && (
             <CreateProject teamId={teamId} onCreated={onProjectCreated} />
           )}
         </div>
 
-        {/* MIDDLE: TASK LIST */}
+        {/* MIDDLE: TASKS */}
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>
-              Tasks for {activeProject?.name || "—"}
-            </h3>
-
-            {user?.role === "admin" && (
-              <button
-                onClick={() => {
-                  setEditTask(null);
-                  setShowTaskModal(true);
-                }}
-                style={btnGreen}
-              >
-                + Add Task
-              </button>
-            )}
-          </div>
-
+          <h3>Tasks for {activeProject?.name || "—"}</h3>
+          {user?.role === "admin" && (
+            <button
+              onClick={() => {
+                setEditTask(null);
+                setShowTaskModal(true);
+              }}
+              style={btnGreen}
+            >
+              + Add Task
+            </button>
+          )}
           <div style={{ marginTop: 12 }}>
             {tasks.map((task) => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onEdit={(t) => {
-                  setEditTask(t);
-                  setShowTaskModal(true);
-                }}
-                onUpdated={(updated) =>
-                  setTasks((prev) =>
-                    prev.map((t) => (t._id === updated._id ? updated : t))
-                  )
-                }
-                onDeleted={(id) =>
-                  setTasks((prev) => prev.filter((t) => t._id !== id))
-                }
-              />
+              <TaskCard key={task._id} task={task} />
             ))}
             {tasks.length === 0 && (
               <div style={{ marginTop: 16, color: "#9CA3AF" }}>
@@ -246,9 +184,9 @@ export default function ProjectView() {
           </div>
         </div>
 
-        {/* RIGHT: ACTIVITY LOG */}
+        {/* RIGHT: ACTIVITY */}
         <div style={{ width: 340 }}>
-          <h3 style={{ marginTop: 0 }}>Activity</h3>
+          <h3>Activity</h3>
           <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
             {activities.map((a) => (
               <div
@@ -273,9 +211,6 @@ export default function ProjectView() {
                 </div>
               </div>
             ))}
-            {activities.length === 0 && (
-              <div style={{ color: "#9CA3AF" }}>No activity yet.</div>
-            )}
           </div>
         </div>
       </div>
@@ -315,9 +250,7 @@ function CreateProject({ teamId, onCreated }) {
         name,
         description: desc,
       });
-      onCreated && onCreated(res.data.data);
-      const socket = getSocket();
-      socket?.emit("project:created", res.data.data);
+      onCreated(res.data.data);
       setOpen(false);
       setName("");
       setDesc("");
@@ -337,7 +270,7 @@ function CreateProject({ teamId, onCreated }) {
       {open && (
         <div style={modalOverlay}>
           <div style={modalBox}>
-            <h4 style={{ marginTop: 0 }}>Create Project</h4>
+            <h4>Create Project</h4>
             <input
               placeholder="Project name"
               value={name}

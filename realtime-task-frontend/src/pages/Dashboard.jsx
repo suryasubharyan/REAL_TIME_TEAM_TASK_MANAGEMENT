@@ -4,10 +4,12 @@ import axios from "../api/axios";
 import TeamCard from "../components/TeamCard";
 import Notification from "../components/Notification";
 import { useAuth } from "../context/AuthContext";
-import { initSocket, getSocket } from "../utils/socket";
+import { useSocket } from "../context/SocketContext";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const socket = useSocket();
+
   const [managedTeams, setManagedTeams] = useState([]);
   const [memberTeams, setMemberTeams] = useState([]);
   const [notif, setNotif] = useState(null);
@@ -15,33 +17,26 @@ export default function Dashboard() {
 
   /* ----------------- SOCKET SETUP ----------------- */
   useEffect(() => {
-    if (!user?._id) return;
+    if (!socket || !user?._id) return;
 
-    let socket;
-    try {
-      socket = getSocket();
-    } catch {
-      socket = initSocket();
-    }
+    console.log("✅ Dashboard socket active for:", user.email);
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       setSocketConnected(true);
       console.log("🟢 Socket connected:", socket.id);
-    });
+    };
 
-    socket.on("disconnect", (reason) => {
+    const handleDisconnect = (reason) => {
       setSocketConnected(false);
       console.warn("🔴 Socket disconnected:", reason);
-    });
+    };
 
-    socket.on("connect_error", (err) => {
-      console.error("⚠️ Socket connect error:", err.message);
-    });
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
 
-    // ✅ Team events (cross-tab sync)
     socket.on("team:created", (team) => {
       if (
-        team.members.some(
+        team.members?.some(
           (m) => m.user === user._id || m.user?._id === user._id
         )
       ) {
@@ -66,17 +61,17 @@ export default function Dashboard() {
       showNotif("❌ A team was deleted", "warning");
     });
 
+    // Initial fetch after socket is ready
     fetchTeams();
 
     return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
       socket.off("team:created");
       socket.off("team:updated");
       socket.off("team:deleted");
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("connect_error");
     };
-  }, [user?._id]);
+  }, [socket, user?._id]);
 
   /* ----------------- FETCH TEAMS ----------------- */
   const fetchTeams = async () => {
@@ -101,7 +96,7 @@ export default function Dashboard() {
       setManagedTeams(managed);
       setMemberTeams(joined);
 
-      const socket = getSocket();
+      // Join all rooms for live updates
       if (socket?.connected) socket.emit("joinTeams", teams.map((t) => t._id));
     } catch (err) {
       console.error("❌ Failed to fetch teams:", err);
@@ -117,11 +112,13 @@ export default function Dashboard() {
   const onCreated = (team) => {
     setManagedTeams((prev) => [team, ...prev]);
     showNotif("✅ Team created successfully", "success");
+    socket?.emit("team:created", team);
   };
 
   const onJoined = (team) => {
     setMemberTeams((prev) => [team, ...prev]);
     showNotif("✅ Joined team successfully", "success");
+    socket?.emit("team:updated", { teamId: team._id });
   };
 
   /* ----------------- UI ----------------- */
@@ -198,8 +195,6 @@ function CreateTeam({ onCreated }) {
     try {
       const res = await axios.post("/team", { name, description: desc });
       onCreated && onCreated(res.data.data);
-      const socket = getSocket();
-      socket?.emit("team:created", res.data.data);
       setOpen(false);
       setName("");
       setDesc("");
@@ -256,8 +251,6 @@ function JoinTeam({ onJoined }) {
     try {
       const res = await axios.post("/team/join", { code });
       onJoined && onJoined(res.data.data);
-      const socket = getSocket();
-      socket?.emit("team:updated", { teamId: res.data.data._id });
       setOpen(false);
       setCode("");
     } catch (err) {
