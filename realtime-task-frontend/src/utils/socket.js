@@ -14,7 +14,7 @@ export const initSocket = (token) => {
 
   socket = io(backendURL, {
     path: "/socket.io", // ✅ matches backend
-    transports: ["websocket", "polling"],
+    transports: ["polling","websocket"],
     withCredentials: true,
     auth: { token },
     reconnection: true,

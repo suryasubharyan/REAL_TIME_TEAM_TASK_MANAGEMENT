@@ -23,6 +23,9 @@ const initializeSocket = (server: http.Server) => {
     pingInterval: 25000, // ✅ keep-alive ping for Render
     pingTimeout: 60000,
   });
+io.engine.on("connection_error", (err) => {
+  console.error("⚠️ Engine connection error:", err.code, err.message);
+});
 
   // 🔐 JWT verification for socket connections
   io.use((socket, next) => {
