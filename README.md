@@ -41,7 +41,7 @@ A **real-time, collaborative team task management system** built using the **MER
 | **Frontend** | React.js (Vite) |
 | **Backend** | Node.js + Express.js |
 | **Database** | MongoDB (Mongoose) |
-| **Real-time** | Socket.IO |
+| **Real-time** | Socket.IO — instant, low-latency bi-directional communication |
 | **API Docs** | Swagger + YAML |
 | **Auth** | JWT (JSON Web Token) |
 | **Deployment** | Render |
@@ -87,22 +87,6 @@ CLIENT_URL=http://localhost:5173
   -VITE_API_BASE_URL=https://backend-g282.onrender.com/api
   -VITE_SOCKET_URL=https://backend-g282.onrender.com
 
-🧩 API Modules
-Module	Path	Description
-Auth	/api/auth	Register & Login
-Team	/api/team	Create / Join / View Teams
-Project	/api/project	Manage Projects under Teams
-Task	/api/task	Manage Tasks under Projects
-Activity	/api/activity	Track All Team & Project Activities
-
-🛰️ Real-Time Socket Events
-Event	Trigger	Description
-team:created	Admin creates a team	Broadcasts to all clients
-project:created	Admin creates project	Notifies all team members
-task_created	Task created	Broadcast task creation
-task_updated	Task updated	Real-time task board update
-task_deleted	Task deleted	Live deletion update
-activity_created	Any user action	Logs and broadcasts activity
 
 🧪 Example Workflow
 
@@ -152,23 +136,16 @@ Add:
 VITE_API_BASE_URL=https://backend-xxxxx.onrender.com/api
 VITE_SOCKET_URL=https://backend-xxxxx.onrender.com
 
-🧠 Swagger Role-Based Access Reference
-API	Description	Role Access
-/api/auth/*	Register / Login	Admin + Member
-/api/team	Create team	Admin
-/api/team/join	Join team by code	Member
-/api/team/my	My teams	Both
-/api/project	Create project	Admin
-/api/project/team/:teamId	View projects	Both
-/api/task	Create task	Admin
-/api/task/project/:projectId	View tasks	Both
-/api/task/:taskId	Update or delete task	Admin / Owner / Assignee
-/api/activity/*	View activities	Both
-🏷️ Badges Legend
-Badge	Meaning
-🟢 Node.js	Backend built with Node.js 22.x
-🧩 Socket.IO	Real-time event system
-🗂️ Swagger	Interactive API documentation
-🔒 JWT Auth	Secure role-based authentication
-🚀 Render Deploy	Hosted live backend
-⚙️ MongoDB Atlas	Cloud database
+
+
+🏷️ Badges Legend (God-styled)
+- 🟢 Node.js — Backend runtime (Node.js 22.x): high-performance, event-driven server.  
+- ⚙️ MongoDB Atlas — Cloud database: scalable, managed document store for production-ready data.  
+- 🧭 Express.js — Minimal, flexible Node.js web framework powering the REST API.  
+- ⚛️ React (Vite) — Frontend: fast, modern UI with Vite dev experience.  
+- 🧩 Socket.IO — Real-time event system: ultra-low latency, reliable bi-directional sockets for instant collaboration.  
+- 📚 Swagger — Interactive API documentation: explore and test endpoints via /api/docs.  
+- 🔒 JWT Auth — Secure token-based auth and role enforcement (admin / member).  
+- 🚀 Render Deploy — Hosted on Render: continuous deployment-ready.
+
+(Styled for clarity and emphasis — short, bold descriptors to make badges instantly readable and eye-catching.)
