@@ -70,19 +70,13 @@ A **real-time, collaborative team task management system** built using the **MER
 - Local: [http://localhost:5000/api/docs](http://localhost:5000/api/docs)  
 - Render: [https://backend-g282.onrender.com/api/docs](https://backend-g282.onrender.com/api/docs)
 
-### 🔐 JWT Authorization:
-In Swagger, click **Authorize** and enter:
 
 
-Bearer <your-jwt-token>
 
 
----
 
-## 🪶 Example `.env` Configuration
 
 ### 🔹 Backend
-```env
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/Real-time-task-manage
 JWT_SECRET=supersecretkey123
